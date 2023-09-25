@@ -29,6 +29,7 @@ pub struct Camera {
     pixel_delta_v: DVec3,
     pixel00_loc: DVec3,
     frame: String,
+    samples_per_pixel: u32,
 }
 
 impl Camera {
@@ -63,6 +64,7 @@ impl Camera {
             pixel_delta_v,
             pixel00_loc,
             frame: String::new(),
+            samples_per_pixel: 100,
         }
     }
     pub fn render(&mut self, d: &mut RaylibDrawHandle, world: &HittableList) {
@@ -74,11 +76,19 @@ impl Camera {
                     + (x as f64 * self.pixel_delta_u)
                     + (y as f64 * self.pixel_delta_v);
 
-                let ray_direction = pixel_center - self.center;
+                let mut rng = fastrand::Rng::new();
 
-                let ray = Ray::new(self.center, ray_direction);
+                let pixel_colour =
+                    (0..self.samples_per_pixel).fold(DVec3::default(), |mut pixel_colour, _| {
+                        // let ray_direction = pixel_center - self.pixel_sample_square();
+                        let pixel_sample = pixel_center + self.pixel_sample_square(&mut rng);
+                        let ray_direction = pixel_sample - self.center;
 
-                let pixel_colour = ray.colour(&world) * 255.;
+                        pixel_colour += Ray::new(self.center, ray_direction).colour(&world)
+                            * 255.0
+                            * (self.samples_per_pixel as f64).recip();
+                        pixel_colour
+                    });
 
                 d.draw_pixel(
                     x as _,
@@ -100,6 +110,10 @@ impl Camera {
             .into_iter()
             .map(|chunk| chunk.into_iter().join(" "))
             .join("\n");
+    }
+
+    fn pixel_sample_square(&self, rng: &mut fastrand::Rng) -> DVec3 {
+        (self.pixel_delta_u + self.pixel_delta_v) * (-0.5 + rng.f64())
     }
 
     pub fn render_to_file(&self, path: &std::path::Path) -> std::io::Result<()> {
