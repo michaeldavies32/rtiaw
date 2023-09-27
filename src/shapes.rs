@@ -1,4 +1,5 @@
 use crate::hittable::{HitRecord, Hittable};
+use crate::materials::Material;
 use crate::ray::Ray;
 use glam::DVec3;
 use std::ops::Range;
@@ -6,11 +7,19 @@ use std::ops::Range;
 pub struct Sphere {
     center: DVec3,
     radius: f64,
+    material: &'static mut dyn Material,
 }
 
 impl Sphere {
-    pub const fn new(center: DVec3, radius: f64) -> Self {
-        Sphere { center, radius }
+    pub fn new<M>(center: DVec3, radius: f64, material: M) -> Self
+    where
+        M: Material + 'static,
+    {
+        Sphere {
+            center,
+            radius,
+            material: Box::leak(Box::new(material)),
+        }
     }
 }
 

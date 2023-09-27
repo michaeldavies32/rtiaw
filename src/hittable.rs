@@ -1,3 +1,4 @@
+use crate::materials::Material;
 use crate::ray::Ray;
 use glam::DVec3;
 use std::ops::Range;
@@ -5,6 +6,7 @@ use std::ops::Range;
 pub struct HitRecord {
     pub p: DVec3,
     pub normal: DVec3,
+    pub material: Option<&'static mut dyn Material>,
     pub t: f64,
     pub front_face: bool,
 }
@@ -20,6 +22,7 @@ impl HitRecord {
             } else {
                 -outward_normal
             },
+            material: None,
             t,
             front_face,
         }

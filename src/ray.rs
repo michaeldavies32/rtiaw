@@ -1,4 +1,7 @@
-use crate::hittable::{Hittable, HittableList};
+use crate::{
+    helpers::RandomExt,
+    hittable::{Hittable, HittableList},
+};
 use glam::DVec3;
 
 pub struct Ray {
@@ -15,13 +18,19 @@ impl Ray {
         self.origin + t * self.direction
     }
 
-    pub fn colour(&self, world: &HittableList) -> DVec3 {
-        if let Some(record) = world.hit(&self, (0.)..f64::INFINITY) {
-            return 0.5 * (record.normal + DVec3::ONE);
+    pub fn colour(&self, depth: i32, world: &HittableList) -> DVec3 {
+        if depth <= 0 {
+            return DVec3::ZERO;
+        }
+
+        if let Some(record) = world.hit(&self, (0.001)..f64::INFINITY) {
+            let direction = record.normal + DVec3::random_on_hemisphere(&record.normal);
+            // return 0.5 * (record.normal + DVec3::ONE);
+            return 0.5 * Ray::new(record.p, direction).colour(depth - 1, world);
         }
         let unit_direction = self.direction.normalize();
         let a = 0.5 * (unit_direction.y + 1.0);
 
-        (1.0 - a) * DVec3::new(1.0, 1.0, 1.0) + a * DVec3::new(0.5, 0.7, 1.0)
+        (1.0 - a) * DVec3::ONE + a * DVec3::new(0.5, 0.7, 1.0)
     }
 }

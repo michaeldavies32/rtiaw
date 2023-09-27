@@ -4,23 +4,8 @@ use glam::DVec3;
 use itertools::Itertools;
 use raylib::prelude::*;
 
-// const ASPECT_RATIO: f64 = 16.0 / 9.0;
-// const IMAGE_WIDTH: u32 = 800;
-// const IMAGE_HEIGHT: u32 = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as u32; //(IMAGE_WIDTH as f32 / ASPECT_RATIO).clamp(1.0, f32::MAX) as u32;
-//
-// const MAX_VALUE: u8 = 255;
-//
-// const VIEWPORT_HEIGHT: f64 = 2.0;
-// const VIEWPORT_WIDTH: f64 = VIEWPORT_HEIGHT * ASPECT_RATIO; //(IMAGE_WIDTH as f64 / IMAGE_HEIGHT as f64);
-//
-// const FOCAL_LENGTH: f64 = 1.0;
-// const CAMERA_CENTER: DVec3 = DVec3::ZERO;
-//
-// const VIEWPORT_U: DVec3 = DVec3::new(VIEWPORT_WIDTH, 0., 0.);
-// const VIEWPORT_V: DVec3 = DVec3::new(0., -VIEWPORT_HEIGHT, 0.);
-
 pub struct Camera {
-    aspect_ratio: f64,
+    _aspect_ratio: f64,
     image_width: u32,
     image_height: u32,
     max_value: u8,
@@ -30,6 +15,7 @@ pub struct Camera {
     pixel00_loc: DVec3,
     frame: String,
     samples_per_pixel: u32,
+    max_depth: u32,
 }
 
 impl Camera {
@@ -55,7 +41,7 @@ impl Camera {
         let pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
 
         Camera {
-            aspect_ratio,
+            _aspect_ratio: aspect_ratio,
             image_height,
             image_width,
             max_value,
@@ -65,9 +51,12 @@ impl Camera {
             pixel00_loc,
             frame: String::new(),
             samples_per_pixel: 100,
+            max_depth: 50,
         }
     }
     pub fn render(&mut self, d: &mut RaylibDrawHandle, world: &HittableList) {
+        let mut rng = fastrand::Rng::new();
+
         self.frame = (0..self.image_height)
             .cartesian_product(0..self.image_width)
             // .progress_count(IMAGE_HEIGHT as u64 * IMAGE_WIDTH as u64)
@@ -76,18 +65,23 @@ impl Camera {
                     + (x as f64 * self.pixel_delta_u)
                     + (y as f64 * self.pixel_delta_v);
 
-                let mut rng = fastrand::Rng::new();
-
                 let pixel_colour =
-                    (0..self.samples_per_pixel).fold(DVec3::default(), |mut pixel_colour, _| {
+                    (0..=self.samples_per_pixel).fold(DVec3::default(), |mut pixel_colour, _| {
                         // let ray_direction = pixel_center - self.pixel_sample_square();
                         let pixel_sample = pixel_center + self.pixel_sample_square(&mut rng);
                         let ray_direction = pixel_sample - self.center;
 
-                        pixel_colour += Ray::new(self.center, ray_direction).colour(&world)
+                        let new_colour = Ray::new(self.center, ray_direction)
+                            .colour(self.max_depth as i32, &world)
                             * 255.0
                             * (self.samples_per_pixel as f64).recip();
+
                         pixel_colour
+                            + DVec3 {
+                                x: new_colour.x.sqrt(),
+                                y: new_colour.y.sqrt(),
+                                z: new_colour.z.sqrt(),
+                            }
                     });
 
                 d.draw_pixel(
@@ -97,7 +91,7 @@ impl Camera {
                         r: pixel_colour.x as _,
                         g: pixel_colour.y as _,
                         b: pixel_colour.z as _,
-                        a: 255u8,
+                        a: u8::MAX,
                     },
                 );
 
@@ -113,7 +107,7 @@ impl Camera {
     }
 
     fn pixel_sample_square(&self, rng: &mut fastrand::Rng) -> DVec3 {
-        (self.pixel_delta_u + self.pixel_delta_v) * (-0.5 + rng.f64())
+        (self.pixel_delta_u * (-0.5 + rng.f64())) + (self.pixel_delta_v * (-0.5 + rng.f64()))
     }
 
     pub fn render_to_file(&self, path: &std::path::Path) -> std::io::Result<()> {
