@@ -24,6 +24,11 @@ impl Ray {
         }
 
         if let Some(record) = world.hit(&self, (0.001)..f64::INFINITY) {
+            if let Some(material) = record.material.as_ref() {
+                if let Some((scattered, attenuation)) = material.scatter(&self, &record) {
+                    return attenuation * scattered.colour(depth - 1, world);
+                }
+            }
             let direction = record.normal + DVec3::random_on_hemisphere(&record.normal);
             // return 0.5 * (record.normal + DVec3::ONE);
             return 0.5 * Ray::new(record.p, direction).colour(depth - 1, world);
